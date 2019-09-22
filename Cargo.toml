@@ -1,0 +1,7 @@
+[package]
+name = "winepath"
+version = "0.0.0"
+authors = ["Renée Kooi <renee@kooi.me>"]
+description = "Convert between Wine and native file paths without spawning a `winepath` process."
+edition = "2018"
+license = "MPL-2.0"
