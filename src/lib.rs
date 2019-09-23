@@ -12,6 +12,11 @@ use std::{
 type NativePath = Path;
 
 /// A file path within Wine. Wrapper around a string.
+///
+/// ```rust
+/// use winepath::WinePath;
+/// let wine_path = WinePath(r"C:\windows\system32\ddraw.dll".to_string());
+/// ```
 #[derive(Debug, Clone)]
 pub struct WinePath(pub String);
 impl AsRef<str> for WinePath {
