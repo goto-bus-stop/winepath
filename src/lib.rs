@@ -58,8 +58,7 @@ impl Display for WinePathError {
     }
 }
 
-impl std::error::Error for WinePathError {
-}
+impl std::error::Error for WinePathError {}
 
 fn default_wineprefix() -> Option<PathBuf> {
     std::env::var_os("HOME").map(PathBuf::from).map(|mut home| {
@@ -103,8 +102,8 @@ fn create_drive_cache(prefix: &NativePath) -> DriveCache {
     let drives_dir = prefix.join("dosdevices");
     let mut drive_cache = DriveCache::default();
 
-    for letter in 'a' as u8..='z' as u8 {
-        let drive_name = [letter, ':' as u8];
+    for letter in b'a'..=b'z' {
+        let drive_name = [letter, b':'];
         let drive_name = std::str::from_utf8(&drive_name).unwrap();
         let drive_dir = drives_dir.join(drive_name);
         if let Ok(target) = drive_dir.read_link() {
@@ -209,7 +208,7 @@ impl WineConfig {
         let index = drive_to_index(drive_letter);
         if let Some(native_root) = self.drive_cache[index].as_ref() {
             let mut path = native_root.to_path_buf();
-            for part in full_path[2..].split(r"\") {
+            for part in full_path[2..].split('\\') {
                 path.push(part);
             }
             Ok(path)

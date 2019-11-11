@@ -29,11 +29,18 @@ fn main() {
     };
 
     let config = WineConfig::from_env().unwrap();
-    println!("{}", match action {
-        Action::ToUnix => config.to_native_path(path).unwrap().to_string_lossy().to_string(),
-        Action::ToWindows => {
-            let path = std::fs::canonicalize(path).unwrap();
-            config.to_wine_path(path).unwrap().to_string()
+    println!(
+        "{}",
+        match action {
+            Action::ToUnix => config
+                .to_native_path(path)
+                .unwrap()
+                .to_string_lossy()
+                .to_string(),
+            Action::ToWindows => {
+                let path = std::fs::canonicalize(path).unwrap();
+                config.to_wine_path(path).unwrap().to_string()
+            }
         }
-    })
+    )
 }
