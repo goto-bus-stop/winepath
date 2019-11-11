@@ -108,7 +108,9 @@ fn create_drive_cache(prefix: &NativePath) -> DriveCache {
         let drive_name = std::str::from_utf8(&drive_name).unwrap();
         let drive_dir = drives_dir.join(drive_name);
         if let Ok(target) = drive_dir.read_link() {
-            drive_cache[drive_to_index(char::from(letter))] = Some(drives_dir.join(target));
+            if let Ok(resolved_path) = drives_dir.join(target).canonicalize() {
+                drive_cache[drive_to_index(char::from(letter))] = Some(resolved_path);
+            }
         }
     }
     drive_cache
