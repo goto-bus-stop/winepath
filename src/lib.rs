@@ -4,7 +4,7 @@
 //!
 //! > Only for use on systems that have Wine!
 use std::{
-    fmt::{self, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter},
     path::{Component, Path, PathBuf},
 };
 
@@ -95,24 +95,51 @@ fn stringify_path(drive_prefix: &str, path: &NativePath) -> String {
         .join(r"\")
 }
 
-type DriveCache = [Option<PathBuf>; 26];
+#[derive(Default)]
+struct DriveCache {
+    drives: [Option<PathBuf>; 26],
+}
 
-// Maybe this should be done in constructors instead
-fn create_drive_cache(prefix: &NativePath) -> DriveCache {
-    let drives_dir = prefix.join("dosdevices");
-    let mut drive_cache = DriveCache::default();
+impl DriveCache {
+    fn from_prefix(prefix: &NativePath) -> Self {
+        let drives_dir = prefix.join("dosdevices");
+        let mut drive_cache = Self::default();
 
-    for letter in b'a'..=b'z' {
-        let drive_name = [letter, b':'];
-        let drive_name = std::str::from_utf8(&drive_name).unwrap();
-        let drive_dir = drives_dir.join(drive_name);
-        if let Ok(target) = drive_dir.read_link() {
-            if let Ok(resolved_path) = drives_dir.join(target).canonicalize() {
-                drive_cache[drive_to_index(char::from(letter))] = Some(resolved_path);
+        for letter in b'a'..=b'z' {
+            let drive_name = [letter, b':'];
+            let drive_name = std::str::from_utf8(&drive_name).unwrap();
+            let drive_dir = drives_dir.join(drive_name);
+            if let Ok(target) = drive_dir.read_link() {
+                if let Ok(resolved_path) = drives_dir.join(target).canonicalize() {
+                    drive_cache.drives[drive_to_index(char::from(letter))] = Some(resolved_path);
+                }
             }
         }
+        drive_cache
     }
-    drive_cache
+
+    fn iter(&self) -> impl Iterator<Item = (char, &Path)> {
+        self.drives.iter().enumerate().filter_map(|(index, path)| {
+            path.as_ref()
+                .map(|path| (index_to_drive(index), path.as_ref()))
+        })
+    }
+
+    fn get(&self, drive_letter: char) -> Option<&Path> {
+        self.drives
+            .get(drive_to_index(drive_letter))
+            .and_then(|path| path.as_ref().map(|path| path.as_ref()))
+    }
+}
+
+impl Debug for DriveCache {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut s = f.debug_struct("DriveCache");
+        for (drive_letter, path) in self.iter() {
+            s.field(std::str::from_utf8(&[drive_letter as u8]).unwrap(), &path);
+        }
+        s.finish()
+    }
 }
 
 /// The main conversion struct: create one of these to do conversions.
@@ -133,7 +160,7 @@ impl WineConfig {
             .or_else(default_wineprefix)
             .ok_or(WinePathError::PrefixNotFound)?;
 
-        let drive_cache = create_drive_cache(&prefix);
+        let drive_cache = DriveCache::from_prefix(&prefix);
 
         Ok(Self {
             prefix,
@@ -155,7 +182,7 @@ impl WineConfig {
     /// ```
     pub fn from_prefix(path: impl Into<PathBuf>) -> Self {
         let prefix: PathBuf = path.into();
-        let drive_cache = create_drive_cache(&prefix);
+        let drive_cache = DriveCache::from_prefix(&prefix);
 
         Self {
             prefix,
@@ -172,15 +199,11 @@ impl WineConfig {
         &self,
         path: &'p NativePath,
     ) -> Result<(String, &'p NativePath), WinePathError> {
-        for (index, root) in self.drive_cache.iter().enumerate() {
-            if root.is_none() {
-                continue;
-            }
-            let root = root.as_ref().unwrap();
+        for (letter, root) in self.drive_cache.iter() {
             // Returns `err` if `root` is not a parent of `path`.
             if let Ok(remaining) = path.strip_prefix(root) {
                 let mut drive = String::new();
-                drive.push(index_to_drive(index));
+                drive.push(letter);
                 drive.push(':');
                 return Ok((drive, remaining));
             }
@@ -205,8 +228,7 @@ impl WineConfig {
         let full_path = path;
 
         let drive_letter = full_path.chars().next().unwrap();
-        let index = drive_to_index(drive_letter);
-        if let Some(native_root) = self.drive_cache[index].as_ref() {
+        if let Some(native_root) = self.drive_cache.get(drive_letter) {
             let mut path = native_root.to_path_buf();
             for part in full_path[2..].split('\\') {
                 path.push(part);
