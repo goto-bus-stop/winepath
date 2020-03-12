@@ -18,6 +18,9 @@ jobs:
           command: check
 
   test:
+    strategy:
+      matrix:
+        toolchain: [stable, beta, nightly]
     name: Test Suite
     runs-on: ubuntu-latest
     steps:
@@ -25,7 +28,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: ${{matrix.toolchain}}
           override: true
       - uses: actions-rs/cargo@v1
         with:
